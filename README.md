@@ -1,2 +1,2 @@
 # TIVA-Launchpad
-Projects written in C on the TIVA TM4C123GXL
+Projects written in C on the TIVA TM4C123GXL; Keil microVision IDE.
