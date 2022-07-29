@@ -1,28 +1,49 @@
+// This is the solution to "Embedded Systems - Shape The World" Lab 3. Two GPIO pins are utilized, namely PA5 and PA7. PA5 is an input, activated high when the switch is pressed. PA7 is an output, staying in a high state when the button is not pressed, and flashing when the button is pressed.
 // Pre-processor directives
-#define GPIO_PORTA_DATA_R 		(*((volatile unsigned long *)0x400043FC))
+#define GPIO_PORTA_DATA_R     (*((volatile unsigned long *)0x400043FC))
 #define GPIO_PORTA_DIR_R      (*((volatile unsigned long *)0x40004400))
 #define GPIO_PORTA_AFSEL_R    (*((volatile unsigned long *)0x40004420))
 #define GPIO_PORTA_PUR_R      (*((volatile unsigned long *)0x40004510))
 #define GPIO_PORTA_DEN_R      (*((volatile unsigned long *)0x4000451C))
 #define GPIO_PORTA_CR_R       (*((volatile unsigned long *)0x40004524))
 #define GPIO_PORTA_AMSEL_R    (*((volatile unsigned long *)0x40004528))
+#define GPIO_PORTA_PCTL_R     (*((volatile unsigned long *)0x4000452C))
 #define SYSCTL_RCGC2_R        (*((volatile unsigned long *)0x400FE608))
+#define PA5 		      (*((volatile unsigned long *)0x40004080))
 
+// Delay function needed for blinking effect of LED 	
+void Delay(void){
+	int i = 0;
+	for(i = 0;i<500000;i++){
+	}
+}
+//Initialize PortA
 void PortA_Init(void){ volatile unsigned long delay;
 	SYSCTL_RCGC2_R |= 0x00000001; // Port A clock
-	delay = SYSCTL_RCGC2_R; // delay
-	GPIO_PORTA_CR_R = 0x1F; // Allow changes to PA4-0
-	GPIO_PORTA_AMSEL_R = 0x00; // Disable analog function
-	GPIO_PORTA_DIR_R = 0x02; // PA2 output
-	GPIO_PORTA_AFSEL_R = 0x00; // No alternate function
-	GPIO_PORTA_PUR_R = 0x11; // Enable pullup resistors on PA4, PA0
-	GPIO_PORTA_DEN_R = 0x1F; // Enable digital pins PA4-PA0
+	delay = SYSCTL_RCGC2_R; // delay to ensure clock is stable
+	//GPIO_PORTA_CR_R = 0x1F; // Allow changes to PA4-0
+	//GPIO_PORTA_AMSEL_R &= ~0x80; // Disable analog function on PA7
+	//GPIO_PORTA_PCTL_R &= ~0xF0000000; // PCTL GPIO PA7
+	GPIO_PORTA_DIR_R = 0x80; // PA7 output, PA5 input
+	//GPIO_PORTA_AFSEL_R &= ~0x80; // No alternate function on PA7
+	GPIO_PORTA_DEN_R = 0xA0; // Enable digital I/O on PA7 & PA5
 }
 
+unsigned long SwitchInput(void){
+	return PA5; //returns 0x20 (pressed) or 0 (not pressed)
+}
 int main(void){
 	PortA_Init();
+	// When switch is not pressed, LED is on (PA7 is high); when switch is pressed (PA5 is high), LED blinks (PA 7 alternates between high and low states, with frequency dependent on the size of the delay)
 	while(1){
-		GPIO_PORTA_DATA_R = 0x04; //Change output of PA2 to 1 (high)
+		if(PA5 == 0){ // i.e. if the button is not pressed
+			GPIO_PORTA_DATA_R = 0x80; //Change output of PA7 to 1 (high)
+		}
+		else { // High, delay, low, delay creates blinking LED effect
+			GPIO_PORTA_DATA_R = 0x80; //Change output of PA7 to 1 (high)
+			Delay();
+			GPIO_PORTA_DATA_R = 0x00; // Set all bits low (most importantly, bit 7, aka PA7)
+			Delay();
+		}
 	}
-	
 }
