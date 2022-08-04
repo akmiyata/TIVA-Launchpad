@@ -26,32 +26,72 @@
 *  4. Test- After coding 
 */
 
-// 1. Pre-processor directives
-#include <TM4C123G_AKM.h> // Custom header with Port B and F register pointers
-// Initialize Ports B & F
-void PortB_Init(void){ volatile unsigned long delay;
-	SYSCTL_RCGC2_R |= 0x00100010; // Enabling clocks for both Port B AND F
-	delay = SYSCTL_RCGC2_R; // delay
-	//GPIO_PORTA_CR_R = 0x1F; // Allow changes to PA4-0
-	//GPIO_PORTA_AMSEL_R &= ~0x80; // Disable analog function on PA7
-	//GPIO_PORTA_PCTL_R &= ~0xF0000000; // PCTL GPIO PA7
-	GPIO_PORTB_DIR_R = 0x3F; // PB7 & 6 input, PB5-0 output
-	//GPIO_PORTA_AFSEL_R &= ~0x80; // No alternate function on PA7
-	GPIO_PORTB_DEN_R = 0xFF; // Enable digital I/O on PB7 through PB0
+// Pre-processor directives
+#include "TM4C123G_AKM.h" // Custom header with Port B, E, and F register pointers
+#include <stdint.h>
+
+#define PB7                 (*((volatile uint32_t *)0x4000E010))
+#define SYSCTL_RCC2_R       (*((volatile uint32_t *)0xE000E010))
+
+#define NVIC_ST_CTRL_R      (*((volatile uint32_t *)0xE000E010))
+#define NVIC_ST_RELOAD_R    (*((volatile uint32_t *)0xE000E014))
+#define NVIC_ST_CURRENT_R   (*((volatile uint32_t *)0xE000E018))
+
+void SysTick_Init(void){
+  NVIC_ST_CTRL_R = 0;               // disable SysTick during setup
+  NVIC_ST_CTRL_R = 0x00000005;      // enable SysTick with core clock
 }
-// REMOVE DEAD CODE ONCE WORKING; DO NOT BLUE LED FOR THIS PROJECT, REMOVE CODE RELATED TO BLUE LED
-void PortF_Init(void){ volatile unsigned long delay;
-//	SYSCTL_RCGC2_R |= 0x00100010; // Port B AND F clock
-//	delay = SYSCTL_RCGC2_R; // delay
-	//GPIO_PORTA_CR_R = 0x1F; // Allow changes to PA4-0
-	//GPIO_PORTA_AMSEL_R &= ~0x80; // Disable analog function on PA7
-	//GPIO_PORTA_PCTL_R &= ~0xF0000000; // PCTL GPIO PA7
-	GPIO_PORTF_DIR_R = 0x0D; // PF3 through PF1 output (onboard LEDs) ELIMINATE BLUE LED
-	//GPIO_PORTA_AFSEL_R &= ~0x80; // No alternate function on PA7
-	GPIO_PORTB_DEN_R = 0x0D; // Enable digital I/O on PF3 through PF1
+
+// The delay parameter is in units of the 80 MHz core clock. (12.5 ns)
+void SysTick_Wait(uint32_t delay){
+  NVIC_ST_RELOAD_R = delay-1;  // number of counts to wait
+  NVIC_ST_CURRENT_R = 0;       // any value written to CURRENT clears
+  while((NVIC_ST_CTRL_R&0x00010000)==0){ // wait for count flag
+  }
+}
+// 800000*12.5ns equals 10ms
+void SysTick_Wait10ms(uint32_t delay){
+  uint32_t i;
+  for(i=0; i<delay; i++){
+    SysTick_Wait(800000);  // wait 10ms
+  }
 }
 
 //  Subroutines
+void PLL_Init(void){
+  SYSCTL_RCC2_R |=  0x80000000;  // USE RCC2 
+  SYSCTL_RCC2_R |=  0x00000800;  // BYPASS2, PLL bypass
+  SYSCTL_RCC_R = (SYSCTL_RCC_R &~0x000007C0)   // clear XTAL field, bits 10-6
+                 + 0x00000540;   // 10101, configure for 16 MHz crystal
+  SYSCTL_RCC2_R &= ~0x00000070;  // configure for main oscillator source
+  SYSCTL_RCC2_R &= ~0x00002000;  // activate PLL by clearing PWRDN
+  SYSCTL_RCC2_R |= 0x40000000;   // set the desired system divider; use 400 MHz PLL
+  SYSCTL_RCC2_R = (SYSCTL_RCC2_R&~ 0x1FC00000)  // clear system clock divider
+                  + (4<<22);      // configure for 80 MHz clock
+  while((SYSCTL_RIS_R&0x00000040)==0){};  // wait for the PLL to lock by polling PLLRIS
+  SYSCTL_RCC2_R &= ~0x00000800;  // enable use of PLL by clearing BYPASS
+}
+
+
+
+int main(void){ volatile uint32_t delay;
+	PLL_Init();
+	SysTick_Init();
+  SYSCTL_RCGC2_R |= 0x00000002; // Enable clock for Port B
+	delay = SYSCTL_RCGC2_R; // delay
+	GPIO_PORTB_DIR_R |= 0x3F; // PB7 & 6 input, PB5-0 output
+	GPIO_PORTB_DEN_R |= 0x3F; // Enable digital I/O on PB5 through PB0
+	GPIO_PORTE_DIR_R &= 0x03; // PE0 & PE1 are inputs
+	GPIO_PORTE_DEN_R |= 0x03; // PE0 & PE1 enable digital I/O
+	while(1){
+		GPIO_PORTB_DATA_R = 0x0C; // Initially, west traffic lights are red, south are green, and onboard LED is Red
+		SysTick_Wait10ms(500);
+		GPIO_PORTB_DATA_R = 0x14; // When car is sensed (button pushed), transition to west light red, south light yellow
+		SysTick_Wait10ms(500);
+		GPIO_PORTB_DATA_R = 0x21; // When car is sensed (button pushed), to finish transition, west light is green, south light red
+		SysTick_Wait10ms(500);
+	}
+}
 
 int main(void){
   PortB_Init();
