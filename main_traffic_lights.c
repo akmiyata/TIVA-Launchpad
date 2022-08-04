@@ -4,18 +4,27 @@
 * 3. Button 3- Walk button; if pressed, both west and south traffic lights must cycle to red, and the led on the PCB will turn from red to green.
 * 4. Lights will stay in state from "3." until a car is sensed at one of the traffic lights (i.e. button 1 or button 2 is pressed).
 */
-// Steps & Pseudo
-/* 1. Setup hardware- In progress (waiting on buttons to arrive)
+
+/* 1. Setup hardware- COMPLETE
 *  Needed: 3 switches (order at least two more); 2 each of green, yellow, red LEDS;  
 *  several wires (detail later); six 220 ohm resistors for LEDS; 3 10K ohm resistors for switch inputs
 *  Red wire- +3.3V power
-*  PB5 (White wire)- (powers green light for west street)
-*  PB0 (Green wire1)- (powers green light for west street)
-*  PB1 (Yellow wire1)- (powers yellow light for west street)
+*  Black wire- GND 
+*  PB0 (green wire)- (powers green light for west street)
+*  PB1 (yellow wire1)- (powers yellow light for west street)
+*  PB2 (white wire1)- (powers red light for west street)
 *  
-*  2. Define/understand requirements- Complete
+*  PB3 (green wire)- powers green light for south street
+*  PB4 (yellow wire1)- powers yellow light for south street
+*  PB5 (white wire1)- powers red light for south street
+*  
+*  PB6 (blue wire)- Input for west street car sensor 
+*  PB7 (blue wire)- Input for south street car sensor
+*  PE2 (blue wire)- Input for crosswalk
+*  2. Define/understand requirements- COMPLETE
 *  3. Code- In progress
-*  4. Test- After coding */
+*  4. Test- After coding 
+*/
 
 // 1. Pre-processor directives
 #include <TM4C123G_AKM.h> // Custom header with Port B and F register pointers
