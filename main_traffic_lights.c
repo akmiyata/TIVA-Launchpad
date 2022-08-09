@@ -22,7 +22,7 @@
 *  
 *  PE0 (blue wire)- Input for west street car sensor 
 *  PE1 (blue wire)- Input for south street car sensor
-*  PA7 (blue wire)- Input for crosswalk
+*  PE2 (blue wire)- Input for crosswalk
 *  2. Define/understand requirements- COMPLETE
 *  3. Code- In progress
 *  4. Test- After coding 
@@ -32,8 +32,10 @@
 #include "TM4C123G_AKM.h" /* Custom header with Port B, E, and F register pointers */
 #include <stdint.h>
 
-#define SENSOR  (*((volatile uint32_t *)0x4002400C))
-#define LIGHT   (*((volatile uint32_t *)0x400050FC))
+#define SENSOR     (*((volatile uint32_t *)0x4002400C))
+#define LIGHT      (*((volatile uint32_t *)0x400050FC))
+#define LIGHTBOARD (*((volatile uint32_t *)0x400253FC)) /* Green & red LEDs on board (PF1 & PF3) */
+#define PE2        (*((volatile uint32_t *)0x40024010)) /* PE2 input */	
 #define goW    0
 #define waitW  1
 #define goS    2
@@ -41,7 +43,7 @@
 
 /* Linked data structure */
 struct State {
-	uint32_t Out;
+	uint32_t Out; /* Output for traffic lights */
 	uint32_t Time;
 	uint32_t Next[4];};
 
@@ -49,9 +51,9 @@ typedef const struct State State_t;
 	
 State_t FSM[4]={
 {0x21,3000,{goW,waitW,goW,waitW}},
-{0x22, 500,{goS,goS,goS,goS}},
+{0x22,500,{goS,goS,goS,goS}},
 {0x0C,3000,{goS,goS,waitS,waitS}},
-{0x14, 500,{goW,goW,goW,goW}}};
+{0x14,500,{goW,goW,goW,goW}}};
 
  uint32_t S; /* Index to the current state */
  uint32_t Input;
@@ -65,19 +67,28 @@ void Delay(void){
 }
 
 int main(void){ volatile uint32_t delay;
-  SYSCTL_RCGC2_R |= 0x00000013; /* Enable clock for Port A, B, & E */
+  SYSCTL_RCGC2_R |= 0x00000032; /* Enable clock for Port B, E & F */
 	delay = SYSCTL_RCGC2_R; /* delay */
-	GPIO_PORTA_DIR_R &= ~0x20; /* PA5 input */
-	GPIO_PORTA_DEN_R |= 0x20; /* PA5 digital enable */
 	GPIO_PORTB_DIR_R |= 0x3F; /* PB5-0 output */
 	GPIO_PORTB_DEN_R |= 0x3F; /* Enable digital I/O on PB5 through PB0 */
-	GPIO_PORTE_DIR_R &= ~0x03; /* PE0 & PE1 are inputs */
-	GPIO_PORTE_DEN_R |= 0x03; /* PE0 & PE1 enable digital I/O */
+	GPIO_PORTE_DIR_R &= ~0x07; /* PE0, PE1, & PE2 are inputs */
+	GPIO_PORTE_DEN_R |= 0x07; /* PE0, PE1, & PE2 enable digital I/O */
+	GPIO_PORTF_LOCK_R = 0x4C4F434B;   /* 2) unlock GPIO Port F */
+  GPIO_PORTF_CR_R = 0x1F;           /* allow changes to PF4-0 */
+	GPIO_PORTF_DIR_R |= 0x0A; /* PF1 & PF3 are outputs (red/green crosswalk light) */
+	GPIO_PORTF_DEN_R |= 0x0A; /* PF1 & PF3 enable digital I/O */
 	S = goW;
 	while(1){
-		LIGHT = FSM[S].Out; /* Set lights */
-		Delay();
-		Input = SENSOR; /* Read input */
-		S = FSM[S].Next[Input];
+		if(PE2 ==0){
+			LIGHTBOARD |= 0x02; /* 0x02 for red */
+			LIGHT = FSM[S].Out; /* Set lights */
+			Delay();
+			Input = SENSOR; /* Read input */
+			S = FSM[S].Next[Input];
+		}
+		else {
+		LIGHT = 0x24;
+		LIGHTBOARD |= 0x08; /* 0x08 for green */	
+		}
 		}
 	}
