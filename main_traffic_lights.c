@@ -32,28 +32,41 @@
 #include "TM4C123G_AKM.h" /* Custom header with Port B, E, and F register pointers */
 #include <stdint.h>
 
-#define SENSOR     (*((volatile uint32_t *)0x4002400C))
+#define SENSOR     (*((volatile uint32_t *)0x4002401C)) /* Inputs from PE0, PE1, and PE2 */
 #define LIGHT      (*((volatile uint32_t *)0x400050FC))
 #define LIGHTBOARD (*((volatile uint32_t *)0x400253FC)) /* Green & red LEDs on board (PF1 & PF3) */
 #define PE2        (*((volatile uint32_t *)0x40024010)) /* PE2 input */	
-#define goW    0
-#define waitW  1
-#define goS    2
-#define waitS  3
+#define goW       0
+#define waitW     1
+#define goS       2
+#define waitS     3
+#define goPed     4
+#define hurryPed  5
+#define hurryPed1 6
+#define hurryPed2 7
+#define hurryPed3 8
+#define hurryPed4 9
 
 /* Linked data structure */
 struct State {
 	uint32_t Out; /* Output for traffic lights */
+	uint32_t OutBoard; /* Output for crosswalk */
 	uint32_t Time;
-	uint32_t Next[4];};
+	uint32_t Next[8];};
 
 typedef const struct State State_t;
 	
-State_t FSM[4]={
-{0x21,3000,{goW,waitW,goW,waitW}},
-{0x22,500,{goS,goS,goS,goS}},
-{0x0C,3000,{goS,goS,waitS,waitS}},
-{0x14,500,{goW,goW,goW,goW}}};
+State_t FSM[10]={
+{0x21,0x02,3000,{goW,waitW,goW,waitW,waitW,waitW,waitW,waitW}},
+{0x22,0x02,500,{goS,goS,goS,goS,goPed,goS,goPed,goS}},
+{0x0C,0x02,3000,{goS,goS,waitS,waitS,waitS,waitS,waitS,waitS}},
+{0x14,0x02,500,{goPed,goPed,goW,goW,goPed,goPed,goPed,goPed}},
+{0x24,0x08,3000,{goPed,hurryPed,hurryPed,hurryPed,goPed,hurryPed,hurryPed,hurryPed}},
+{0x24,0x02,500,{hurryPed1,hurryPed1,hurryPed1,hurryPed1,hurryPed1,hurryPed1,hurryPed1,hurryPed1}},
+{0x24,0x00,500,{hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2}},
+{0x24,0x02,500,{hurryPed3,hurryPed3,hurryPed3,hurryPed3,hurryPed3,hurryPed3,hurryPed3,hurryPed3}},
+{0x24,0x00,500,{hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4}},
+{0x24,0x02,500,{goW,goS,goW,goW,goW,goS,goW,goW}}};
 
  uint32_t S; /* Index to the current state */
  uint32_t Input;
@@ -78,17 +91,13 @@ int main(void){ volatile uint32_t delay;
 	GPIO_PORTF_DIR_R |= 0x0A; /* PF1 & PF3 are outputs (red/green crosswalk light) */
 	GPIO_PORTF_DEN_R |= 0x0A; /* PF1 & PF3 enable digital I/O */
 	S = goW;
-	while(1){
-		if(PE2 ==0){
-			LIGHTBOARD |= 0x02; /* 0x02 for red */
+	while(1)
+		 {
+			LIGHTBOARD = FSM[S].OutBoard; /* 0x02 for red */
 			LIGHT = FSM[S].Out; /* Set lights */
 			Delay();
 			Input = SENSOR; /* Read input */
 			S = FSM[S].Next[Input];
-		}
-		else {
-		LIGHT = 0x24;
-		LIGHTBOARD |= 0x08; /* 0x08 for green */	
-		}
-		}
+     }
+	
 	}
