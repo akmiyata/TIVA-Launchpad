@@ -1,6 +1,6 @@
-This folder contains files related to the solution for Lab 5 in the University of Texas' "Embedded Systems - Shape The World" course. 
+This folder contains files related to the solution for Lab 10 (from Chapter 10) in the University of Texas' "Embedded Systems - Shape The World" course (https://users.ece.utexas.edu/~valvano/Volume1/E-Book/). 
 
-Description: Lab 5 is intended to simulate a traffic light intersection, with two sets of traffic lights (for East-West, and North-South directions) as well as a
+Description: Lab 10 is intended to simulate a traffic light intersection, with two sets of traffic lights (for East-West, and North-South directions) as well as a
 crosswalk light indicator. 
 
 Requirements (see https://www.youtube.com/watch?v=qNl7vayZEz0&list=PLyg2vmIzGxXEle4_R2VA_J5uwTWktdWTu&index=15 for an illustration of intended operation):
