@@ -25,7 +25,7 @@
 *  PE2 (blue wire)- Input for crosswalk
 *  2. Define/understand requirements- COMPLETE
 *  3. Code- COMPLETE
-*  4. Test- After coding 
+*  4. Test- COMPLETE 
 */
 
 /* Pre-processor directives*/
@@ -41,16 +41,16 @@
 #define NVIC_ST_CTRL_R          (*((volatile uint32_t *)0xE000E010)) /* Systick */
 #define NVIC_ST_RELOAD_R        (*((volatile uint32_t *)0xE000E014)) /* Systick */
 #define NVIC_ST_CURRENT_R       (*((volatile uint32_t *)0xE000E018)) /* Systick */
-#define goW                     0
-#define waitW                   1
-#define goS                     2
-#define waitS                   3
-#define goPed                   4
-#define hurryPed                5
-#define Pause1                  6
-#define hurryPed2               7
-#define Pause2                  8
-#define hurryPed4               9
+#define goW                     0                                    /* Allow cars to move from west direction- west light is green */
+#define waitW                   1                                    /* Slow cars from west direction- west light is yellow then red */
+#define goS                     2                                    /* Allow cars to move from south direction- south light is green */
+#define waitS                   3                                    /* Slow cars from south direction- south light is yellow then red */
+#define goPed                   4                                    /* Allow pedestrians to cross street- west & south lights are red */
+#define hurryPed                5                                    /* Let pedestrians know to hurry across the street, initial light-up (onboard LED is red) */
+#define Pause1                  6                                    /* Let pedestrians know to hurry across the street, initial blink (onboard LED is off) */
+#define hurryPed2               7                                    /* Let pedestrians know to hurry across the street, LED light-up (onboard LED is red) */
+#define Pause2                  8                                    /* Let pedestrians know to hurry across the street, second blink (onboard LED is off) */
+#define hurryPed4               9                                    /* Let pedestrians know to hurry across the street, LED light-up (onboard LED is red) */
 
 /* Linked data structure */
 struct State {
@@ -135,9 +135,9 @@ int main(void){ volatile uint32_t delay;
 		 {
 			LIGHTBOARD = FSM[S].OutBoard; /* 0x02 for red */
 			LIGHT = FSM[S].Out; /* Set lights */
-			SysTick_Wait10ms(FSM[S].Time);
+			SysTick_Wait10ms(FSM[S].Time); /* Delay based on time specified in struct */
 			Input = SENSOR; /* Read input */
-			S = FSM[S].Next[Input];
+			S = FSM[S].Next[Input]; /* Move to next state based on input (button pressed) */
      }
 	
 	}
