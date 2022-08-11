@@ -24,7 +24,7 @@
 *  PE1 (blue wire)- Input for south street car sensor
 *  PE2 (blue wire)- Input for crosswalk
 *  2. Define/understand requirements- COMPLETE
-*  3. Code- In progress
+*  3. Code- COMPLETE
 *  4. Test- After coding 
 */
 
@@ -32,20 +32,25 @@
 #include "TM4C123G_AKM.h" /* Custom header with Port B, E, and F register pointers */
 #include <stdint.h>
 
-#define SENSOR     (*((volatile uint32_t *)0x4002401C)) /* Inputs from PE0, PE1, and PE2 */
-#define LIGHT      (*((volatile uint32_t *)0x400050FC))
-#define LIGHTBOARD (*((volatile uint32_t *)0x400253FC)) /* Green & red LEDs on board (PF1 & PF3) */
-#define PE2        (*((volatile uint32_t *)0x40024010)) /* PE2 input */	
-#define goW       0
-#define waitW     1
-#define goS       2
-#define waitS     3
-#define goPed     4
-#define hurryPed  5
-#define hurryPed1 6
-#define hurryPed2 7
-#define hurryPed3 8
-#define hurryPed4 9
+#define SENSOR                  (*((volatile uint32_t *)0x4002401C)) /* Inputs from PE0, PE1, and PE2 */
+#define LIGHT                   (*((volatile uint32_t *)0x400050FC))
+#define LIGHTBOARD              (*((volatile uint32_t *)0x400253FC)) /* Green & red LEDs on board (PF1 & PF3) */
+#define SYSCTL_RCC_R            (*((volatile uint32_t *)0x400FE060)) /* PLL */
+#define SYSCTL_RCC2_R           (*((volatile uint32_t *)0x400FE070)) /* PLL */	
+#define SYSCTL_RIS_R            (*((volatile uint32_t *)0x400FE050)) /* PLL */
+#define NVIC_ST_CTRL_R          (*((volatile uint32_t *)0xE000E010)) /* Systick */
+#define NVIC_ST_RELOAD_R        (*((volatile uint32_t *)0xE000E014)) /* Systick */
+#define NVIC_ST_CURRENT_R       (*((volatile uint32_t *)0xE000E018)) /* Systick */
+#define goW                     0
+#define waitW                   1
+#define goS                     2
+#define waitS                   3
+#define goPed                   4
+#define hurryPed                5
+#define Pause1                  6
+#define hurryPed2               7
+#define Pause2                  8
+#define hurryPed4               9
 
 /* Linked data structure */
 struct State {
@@ -57,29 +62,64 @@ struct State {
 typedef const struct State State_t;
 	
 State_t FSM[10]={
-{0x21,0x02,3000,{goW,waitW,goW,waitW,waitW,waitW,waitW,waitW}},
-{0x22,0x02,500,{goS,goS,goS,goS,goPed,goS,goPed,goS}},
-{0x0C,0x02,3000,{goS,goS,waitS,waitS,waitS,waitS,waitS,waitS}},
-{0x14,0x02,500,{goPed,goPed,goW,goW,goPed,goPed,goPed,goPed}},
-{0x24,0x08,3000,{goPed,hurryPed,hurryPed,hurryPed,goPed,hurryPed,hurryPed,hurryPed}},
-{0x24,0x02,500,{hurryPed1,hurryPed1,hurryPed1,hurryPed1,hurryPed1,hurryPed1,hurryPed1,hurryPed1}},
-{0x24,0x00,500,{hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2}},
-{0x24,0x02,500,{hurryPed3,hurryPed3,hurryPed3,hurryPed3,hurryPed3,hurryPed3,hurryPed3,hurryPed3}},
-{0x24,0x00,500,{hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4}},
-{0x24,0x02,500,{goW,goS,goW,goW,goW,goS,goW,goW}}};
+{0x21,0x02,50,{goW,waitW,goW,waitW,waitW,waitW,waitW,waitW}},
+{0x22,0x02,50,{goS,goS,goS,goS,goPed,goS,goPed,goS}},
+{0x0C,0x02,50,{goS,goS,waitS,waitS,waitS,waitS,waitS,waitS}},
+{0x14,0x02,50,{goPed,goPed,goW,goW,goPed,goPed,goPed,goPed}},
+{0x24,0x08,50,{goPed,hurryPed,hurryPed,hurryPed,goPed,hurryPed,hurryPed,hurryPed}},
+{0x24,0x02,50,{Pause1,Pause1,Pause1,Pause1,Pause1,Pause1,Pause1,Pause1}},
+{0x24,0x00,50,{hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2,hurryPed2}},
+{0x24,0x02,50,{Pause2,Pause2,Pause2,Pause2,Pause2,Pause2,Pause2,Pause2}},
+{0x24,0x00,50,{hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4,hurryPed4}},
+{0x24,0x02,50,{goW,goS,goW,goW,goW,goS,goW,goW}}};
 
  uint32_t S; /* Index to the current state */
  uint32_t Input;
-/* Function prototypes */
-void Delay(void);
 
-void Delay(void){
-	int i = 0;
-	for(i = 0;i<1000000;i++){
-	}
+/* Function prototypes */
+void PLL_Init(void);
+void SysTick_Init(void);
+void SysTick_Wait(uint32_t delay);
+void SysTick_Wait10ms(uint32_t delay);
+
+void PLL_Init(void){
+  SYSCTL_RCC2_R |=  0x80000000;  /* USERCC2 */
+  SYSCTL_RCC2_R |=  0x00000800;  /* BYPASS2, PLL bypass */
+  SYSCTL_RCC_R = (SYSCTL_RCC_R &~0x000007C0)   /* clear XTAL field, bits 10-6 */
+                 + 0x00000540;   /* 10101, configure for 16 MHz crystal */
+  SYSCTL_RCC2_R &= ~0x00000070;  /* configure for main oscillator source */
+  SYSCTL_RCC2_R &= ~0x00002000;
+  SYSCTL_RCC2_R |= 0x40000000;   /* use 400 MHz PLL */
+  SYSCTL_RCC2_R = (SYSCTL_RCC2_R&~ 0x1FC00000)  /* clear system clock divider */
+                  + (4<<22);      /* configure for 80 MHz clock */
+  while((SYSCTL_RIS_R&0x00000040)==0){}  /* wait for PLLRIS bit */
+  SYSCTL_RCC2_R &= ~0x00000800;
+}
+
+void SysTick_Init(void){
+  NVIC_ST_CTRL_R = 0;               // disable SysTick during setup
+  NVIC_ST_CTRL_R = 0x00000005;      // enable SysTick with core clock
+}
+
+/* The delay parameter is in units of the 80 MHz core clock. (12.5 ns) */
+void SysTick_Wait(uint32_t delay){
+  NVIC_ST_RELOAD_R = delay-1;  /* number of counts to wait */
+  NVIC_ST_CURRENT_R = 0;       /* any value written to CURRENT clears */
+  while((NVIC_ST_CTRL_R&0x00010000)==0){ /* wait for count flag */
+  }
+}
+
+/* 800000*12.5ns equals 10ms */
+void SysTick_Wait10ms(uint32_t delay){
+  uint32_t i;
+  for(i=0; i<delay; i++){
+    SysTick_Wait(800000);  /* wait 10ms */
+  }
 }
 
 int main(void){ volatile uint32_t delay;
+	PLL_Init();
+	SysTick_Init();
   SYSCTL_RCGC2_R |= 0x00000032; /* Enable clock for Port B, E & F */
 	delay = SYSCTL_RCGC2_R; /* delay */
 	GPIO_PORTB_DIR_R |= 0x3F; /* PB5-0 output */
@@ -95,7 +135,7 @@ int main(void){ volatile uint32_t delay;
 		 {
 			LIGHTBOARD = FSM[S].OutBoard; /* 0x02 for red */
 			LIGHT = FSM[S].Out; /* Set lights */
-			Delay();
+			SysTick_Wait10ms(FSM[S].Time);
 			Input = SENSOR; /* Read input */
 			S = FSM[S].Next[Input];
      }
